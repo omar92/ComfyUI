@@ -11,7 +11,7 @@ function getNumberDefaults(inputData, defaultStep) {
 }
 
 export function addRandomizeWidget(node, targetWidget, name, defaultValue = false) {
-	const randomize = node.addWidget("toggle", name, defaultValue, function (v) {}, {
+	const randomize = node.addWidget("toggle", name, defaultValue, function (v) { }, {
 		on: "enabled",
 		off: "disabled",
 		serialize: false, // Don't include this in prompt.
@@ -201,22 +201,46 @@ export const ComfyWidgets = {
 	"INT:noise_seed": seedWidget,
 	FLOAT(node, inputName, inputData) {
 		const { val, config } = getNumberDefaults(inputData, 0.5);
-		return { widget: node.addWidget("number", inputName, val, () => {}, config) };
+		var w = node.addWidget("text",//to allow operations like 1.1+1.3
+			inputName,
+			val,
+			(v) => {
+				// check if v is a valid equation or a number
+				if (/^[0-9+\-*/()\s]+$/.test(v)) {
+					try {//solve the equation if possible
+						v = eval(v);
+					} catch (e) { }
+				}
+				w.value = Number(v);
+			},
+			config);
+
+		return {
+			widget: w,
+		};
 	},
 	INT(node, inputName, inputData) {
 		const { val, config } = getNumberDefaults(inputData, 1);
 		Object.assign(config, { precision: 0 });
+		var w = node.addWidget(
+			"text",//to allow operations like 1+1
+			inputName,
+			val,
+			function (v) {
+				// check if v is a valid equation or a number
+				if (/^[0-9+\-*/()\s]+$/.test(v)) {
+					try {//solve the equation if possible
+						v = eval(v);
+					} catch (e) { }
+				}
+				v = Number(v);
+				const s = w.options.step / 10;
+				w.value = Math.round(v / s) * s;
+			},
+			config);
+
 		return {
-			widget: node.addWidget(
-				"number",
-				inputName,
-				val,
-				function (v) {
-					const s = this.options.step / 10;
-					this.value = Math.round(v / s) * s;
-				},
-				config
-			),
+			widget: w,
 		};
 	},
 	STRING(node, inputName, inputData, app) {
@@ -226,7 +250,7 @@ export const ComfyWidgets = {
 		if (multiline) {
 			return addMultilineWidget(node, inputName, { defaultVal, ...inputData[1] }, app);
 		} else {
-			return { widget: node.addWidget("text", inputName, defaultVal, () => {}, {}) };
+			return { widget: node.addWidget("text", inputName, defaultVal, () => { }, {}) };
 		}
 	},
 	COMBO(node, inputName, inputData) {
@@ -235,7 +259,7 @@ export const ComfyWidgets = {
 		if (inputData[1] && inputData[1].default) {
 			defaultValue = inputData[1].default;
 		}
-		return { widget: node.addWidget("combo", inputName, defaultValue, () => {}, { values: type }) };
+		return { widget: node.addWidget("combo", inputName, defaultValue, () => { }, { values: type }) };
 	},
 	IMAGEUPLOAD(node, inputName, inputData, app) {
 		const imageWidget = node.widgets.find((w) => w.name === "image");
